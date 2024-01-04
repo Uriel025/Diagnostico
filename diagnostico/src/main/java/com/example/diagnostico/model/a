@@ -1,0 +1,175 @@
+
+@SpringBootApplication
+public class TallerMecanicoApplication {
+
+public static void main(String[] args) {
+SpringApplication.run(TallerMecanicoApplication.class, args);
+}
+
+}
+
+(apliccation properties)
+server.port=8081
+
+spring.jpa.hibernate.ddl-auto=update
+
+#conf base de datos
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+spring.datasource.username=root
+spring.datasource.password=root
+spring.datasource.url=jdbc:mysql://localhost/fgalvan?allowPublicKeyRetrieval=true&useSSL=false
+spring.jpa.show-sql=true
+
+#conf hibernate
+spring.jpa.database-platform=org.hibernate.dialect.MySQL8Dialect
+logging.level.org.springframework.web=DEBUG
+
+
+
+//Mapeado de la clase cliente que esta heredando(estamos en la clase cliente)
+
+@OneToOne(mappedBy = "clienteBean")
+    @JsonIgnore
+    private CocheBean cocheBean;
+
+//Estas en la clase CocheBean y estas metiendo una columna
+
+ @OneToOne(optional = false, cascade = CascadeType.PERSIST)//se pone el Persist para que los daots id_cliente
+    @JsonIgnore
+    @JoinColumn(name = "id_cliente")
+    private ClienteBean clienteBean;
+
+//mapeado de clase CocheBean a la clase de ReparacionesBean de uno a muchos
+*Dependiando se pone OneToMany o ManyToOne*
+
+@OneToMany(fetch = FetchType.LAZY, mappedBy = "cocheBean")
+    @JsonIgnore
+    private Set<ReparacionBean> reparaciones = new HashSet<>();
+
+
+//join de muchos a uno a la clase BeanReparaciones
+
+@ManyToOne(fetch = FetchType.LAZY)
+    @JsonIgnore
+    @JoinColumn(name = "id_coche")
+    private CocheBean cocheBean;
+
+//Mapeado de ManyToMany esto es el mapeado (estamos en la clase reparaciones)
+
+ @ManyToMany(mappedBy = "reparaciones")
+    private Set<PiezasBean> piezas = new HashSet<>();
+
+
+//En la clase Piezas se hizo la creacion de la tabla de muchos a muchos
+
+@ManyToMany(cascade = CascadeType.ALL)
+    @JoinTable(name = "TablaInterseccion", joinColumns = @JoinColumn(name = "id_pieza"),
+    inverseJoinColumns = @JoinColumn(name = "id_reparacion"))
+    private Set<ReparacionBean> reparaciones = new HashSet<>();
+
+//Dao
+
+public interface ClienteDao extends CrudRepository<ClienteBean, Integer> {
+
+//ICliente
+
+ ClienteBean save(ClienteDto cliente);
+
+    ClienteBean findById(Integer id);
+
+    List<ClienteBean> findAll();
+
+    void delete(ClienteBean cliente);
+
+
+
+
+@Service
+public class ClienteImpl implements ICliente {
+
+   @Autowired
+   private ClienteDao clienteDao;
+
+    @Override
+    @Transactional
+    public ClienteBean save(ClienteDto clienteDto) {
+
+        ClienteBean cliente = ClienteBean.builder()
+                .idcliente(clienteDto.getIdcliente())
+                .nombre(clienteDto.getNombre())
+                .apellidos(clienteDto.getApellidos())
+                .telefono(clienteDto.getTelefono())
+                .direccion(clienteDto.getDireccion())
+                .build();
+        return clienteDao.save(cliente);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ClienteBean findById(Integer id) {
+        return clienteDao.findById(id).orElse(null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ClienteBean> findAll() {
+        return (List<ClienteBean>) clienteDao.findAll();
+    }
+
+    @Override
+    @Transactional
+    public void delete(ClienteBean cliente) {
+        clienteDao.delete(cliente);
+    }
+}
+
+
+
+@AllArgsConstructor
+@RestController
+@RequestMapping("api/v1/cliente")
+public class ClienteController {
+
+    private final ICliente clienteService;
+
+    @GetMapping("/")
+    public List<ClienteBean> getCliente() {
+        return clienteService.findAll();
+    }
+
+    @GetMapping("/{id}")
+    public ClienteBean showById(@PathVariable Integer id) {
+        return clienteService.findById(id);
+    }
+
+    @PostMapping("/")
+    public ClienteDto create(@RequestBody ClienteDto clienteDto) {
+        ClienteBean clienteSave = clienteService.save(clienteDto);
+        return ClienteDto.builder()
+                .idcliente(clienteSave.getIdcliente())
+                .nombre(clienteSave.getNombre())
+                .apellidos(clienteSave.getApellidos())
+                .telefono(clienteSave.getTelefono())
+                .direccion(clienteSave.getDireccion())
+                .build();
+    }
+
+    @PutMapping("/")
+    public ClienteDto update(@RequestBody ClienteDto clienteDto) {
+        ClienteBean clienteUpdate = clienteService.save(clienteDto);
+        return ClienteDto.builder()
+                .idcliente(clienteUpdate.getIdcliente())
+                .nombre(clienteUpdate.getNombre())
+                .apellidos(clienteUpdate.getApellidos())
+                .direccion(clienteUpdate.getDireccion())
+                .telefono(clienteUpdate.getTelefono())
+                .build();
+    }
+
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable Integer id) {
+        ClienteBean cliente = clienteService.findById(id);
+        clienteService.delete(cliente);
+    }
+
+}
